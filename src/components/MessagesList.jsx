@@ -47,24 +47,25 @@ export default function MessagesList() {
             return;
         }
 
+        // Query messages where participantId matches (either as sender or recipient)
         const q = query(
             collection(db, 'instagram_messages'),
-            orderBy('createdAt', 'desc'),
+            where('participantId', '==', selectedConversation.participantId),
+            orderBy('createdAt', 'asc'), // Order by date ASC for natural chat flow
             limit(100)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const allMessages = snapshot.docs.map(doc => ({
+            const history = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data(),
                 createdAt: doc.data().createdAt?.toDate?.() || new Date(),
             }));
 
-            // Filter by conversation participant
-            const filtered = allMessages.filter(
-                m => m.from?.id === selectedConversation.participantId
-            );
-            setMessages(filtered);
+            setMessages(history);
+        }, (error) => {
+            console.error('Error fetching messages:', error);
+            // If index error occurs, we might need to fallback to client-side filtering temporarily
         });
 
         return () => unsubscribe();
@@ -99,10 +100,10 @@ export default function MessagesList() {
                                 onClick={() => setSelectedConversation(conv)}
                             >
                                 <div className="conv-avatar">
-                                    {conv.participantId?.slice(-2) || '??'}
+                                    {conv.participantUsername ? conv.participantUsername.slice(0, 2).toUpperCase() : '??'}
                                 </div>
                                 <div className="conv-info">
-                                    <span className="conv-id">ID: {conv.participantId?.slice(0, 10)}...</span>
+                                    <span className="conv-id">@{conv.participantUsername || `ID: ${conv.participantId?.slice(0, 10)}...`}</span>
                                     <p className="conv-preview">{conv.lastMessage?.text?.slice(0, 40)}...</p>
                                 </div>
                                 {conv.unreadCount > 0 && (
@@ -123,7 +124,7 @@ export default function MessagesList() {
                 ) : (
                     <>
                         <div className="chat-header">
-                            <span>Usuario ID: {selectedConversation.participantId}</span>
+                            <span>Chat con <strong>@{selectedConversation.participantUsername || selectedConversation.participantId}</strong></span>
                         </div>
 
                         <div className="chat-messages">
@@ -131,7 +132,7 @@ export default function MessagesList() {
                                 <p className="chat-empty">No hay mensajes</p>
                             ) : (
                                 messages.map(msg => (
-                                    <div key={msg.id} className="message-bubble incoming">
+                                    <div key={msg.id} className={`message-bubble ${msg.fromMe ? 'outgoing' : 'incoming'}`}>
                                         <p>{msg.text}</p>
                                         <span className="message-time">{formatTime(msg.createdAt)}</span>
                                     </div>

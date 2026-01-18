@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import axios from 'axios';
 import { db } from '../lib/firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
@@ -157,19 +158,40 @@ async function processDirectMessage(messagingEvent, igAccountId) {
         return;
     }
 
-    // Build message document
+    // Try to fetch username from Meta
+    let username = null;
+    try {
+        let token = process.env.META_ACCESS_TOKEN?.trim() || '';
+        if (token.startsWith('"') && token.endsWith('"')) {
+            token = token.substring(1, token.length - 1);
+        }
+
+        const userResponse = await axios.get(`https://graph.instagram.com/v21.0/${senderId}`, {
+            params: {
+                fields: 'username',
+                access_token: token
+            }
+        });
+        username = userResponse.data.username;
+    } catch (err) {
+        console.error(`⚠️ Could not fetch username for ${senderId}:`, err.message);
+    }
+
+    // Build message document (Unified History)
     const messageDoc = {
         id: messageId,
         type: 'dm',
         text: messagingEvent.message.text || '',
+        fromMe: false,
+        participantId: senderId,
+        participantUsername: username,
         attachments: messagingEvent.message.attachments || [],
         from: {
             id: senderId,
-            // Username not available in DM webhook, will need to fetch separately
+            username: username
         },
         recipientId: recipientId,
         igAccountId: igAccountId,
-        replied: false,
         timestamp: messagingEvent.timestamp ? new Date(messagingEvent.timestamp) : null,
         createdAt: FieldValue.serverTimestamp(),
         receivedAt: FieldValue.serverTimestamp(),
@@ -177,20 +199,20 @@ async function processDirectMessage(messagingEvent, igAccountId) {
 
     // Save to Firestore
     await db.collection('instagram_messages').doc(messageId).set(messageDoc);
-    console.log(`✅ Saved DM ${messageId} from ${senderId}`);
+    console.log(`✅ Saved DM ${messageId} from ${username || senderId}`);
 
     // Also update/create conversation thread
-    await updateConversation(senderId, igAccountId, messageDoc);
+    await updateConversation(senderId, username, igAccountId, messageDoc);
 }
 
 /**
  * Update or create a conversation thread for DMs
  */
-async function updateConversation(senderId, igAccountId, messageDoc) {
+async function updateConversation(senderId, username, igAccountId, messageDoc) {
     const conversationId = `${igAccountId}_${senderId}`;
     const conversationRef = db.collection('instagram_conversations').doc(conversationId);
 
-    await conversationRef.set({
+    const updateData = {
         igAccountId: igAccountId,
         participantId: senderId,
         lastMessage: {
@@ -200,6 +222,12 @@ async function updateConversation(senderId, igAccountId, messageDoc) {
         },
         unreadCount: FieldValue.increment(1),
         updatedAt: FieldValue.serverTimestamp(),
-    }, { merge: true });
+    };
+
+    if (username) {
+        updateData.participantUsername = username;
+    }
+
+    await conversationRef.set(updateData, { merge: true });
 }
 

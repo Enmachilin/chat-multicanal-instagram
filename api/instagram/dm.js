@@ -57,20 +57,29 @@ export default async function handler(req, res) {
 
         const messageId = response.data.message_id;
 
-        // Save sent message to Firestore
-        const sentMessageDoc = {
+        // Save sent message to Firestore (Unified History)
+        const messageDoc = {
             id: messageId,
-            recipientId: recipientId,
-            message: message,
-            sentAt: FieldValue.serverTimestamp(),
-            success: true,
+            text: message,
+            fromMe: true,
+            participantId: recipientId,
+            igAccountId: process.env.INSTAGRAM_ACCOUNT_ID,
+            createdAt: FieldValue.serverTimestamp(),
         };
 
-        await db.collection('instagram_sent_messages').doc(messageId).set(sentMessageDoc);
+        await db.collection('instagram_messages').doc(messageId).set(messageDoc);
+
+        // Also keep in sent for backwards compat/backup
+        await db.collection('instagram_sent_messages').doc(messageId).set({
+            ...messageDoc,
+            success: true
+        });
 
         // Update conversation
         const conversationId = `${process.env.INSTAGRAM_ACCOUNT_ID}_${recipientId}`;
         await db.collection('instagram_conversations').doc(conversationId).set({
+            igAccountId: process.env.INSTAGRAM_ACCOUNT_ID,
+            participantId: recipientId,
             lastMessage: {
                 text: message,
                 timestamp: FieldValue.serverTimestamp(),
