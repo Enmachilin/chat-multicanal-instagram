@@ -144,90 +144,101 @@ export default function CommentsList() {
                 </div>
             ) : (
                 <div className="comments-list">
-                    {comments.map(comment => (
-                        <div key={comment.id} className="comment-group">
-                            {/* Original Comment */}
-                            <div
-                                className={`comment-card ${comment.replied ? 'replied' : 'pending'}`}
-                            >
-                                <div className="comment-header">
-                                    <span className="comment-username">
-                                        @{comment.from?.username || 'usuario'}
-                                    </span>
-                                    <span className="comment-time">
-                                        {formatDate(comment.createdAt)}
-                                    </span>
-                                    {comment.mediaPermalink && (
-                                        <a
-                                            href={comment.mediaPermalink}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="view-post-link"
-                                            title="Ver publicación original"
-                                        >
-                                            🔗 Ver Post
-                                        </a>
-                                    )}
-                                    <span className={`comment-status ${comment.replied ? 'replied' : 'pending'}`}>
-                                        {comment.replied ? '✓ Respondido' : '• Pendiente'}
-                                    </span>
-                                </div>
+                    {comments.map(comment => {
+                        // Smart Status: A comment is replied if marked true OR if it has children in UI
+                        const hasDashboardReply = responses[comment.id] && responses[comment.id].length > 0;
+                        const hasExternalReply = externalReplies[comment.id] && externalReplies[comment.id].filter(reply => {
+                            const isDashDuplicate = responses[comment.id]?.some(r => r.id === reply.id);
+                            return !isDashDuplicate;
+                        }).length > 0;
 
-                                <p className="comment-text">{comment.text}</p>
+                        const isEffectivelyReplied = comment.replied || hasDashboardReply || hasExternalReply;
 
-                                {!comment.replied && (
-                                    <button
-                                        className="reply-btn"
-                                        onClick={() => setSelectedComment(comment)}
-                                    >
-                                        Responder
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Grouped Replies from our Dashboard */}
-                            {responses[comment.id] && responses[comment.id].map(reply => (
-                                <div key={reply.id} className="comment-reply-card">
-                                    <div className="reply-connector"></div>
-                                    <div className="reply-content dashboard-reply">
-                                        <div className="comment-header">
-                                            <span className="comment-username admin-name">
-                                                Tú (vía Dashboard)
-                                            </span>
-                                            <span className="comment-time">
-                                                {formatDate(reply.sentAt)}
-                                            </span>
-                                        </div>
-                                        <p className="comment-text">{reply.message}</p>
+                        return (
+                            <div key={comment.id} className="comment-group">
+                                {/* Original Comment */}
+                                <div
+                                    className={`comment-card ${isEffectivelyReplied ? 'replied' : 'pending'}`}
+                                >
+                                    <div className="comment-header">
+                                        <span className="comment-username">
+                                            @{comment.from?.username || 'usuario'}
+                                        </span>
+                                        <span className="comment-time">
+                                            {formatDate(comment.createdAt)}
+                                        </span>
+                                        {comment.mediaPermalink && (
+                                            <a
+                                                href={comment.mediaPermalink}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="view-post-link"
+                                                title="Ver publicación original"
+                                            >
+                                                🔗 Ver Post
+                                            </a>
+                                        )}
+                                        <span className={`comment-status ${isEffectivelyReplied ? 'replied' : 'pending'}`}>
+                                            {isEffectivelyReplied ? '✓ Respondido' : '• Pendiente'}
+                                        </span>
                                     </div>
-                                </div>
-                            ))}
 
-                            {/* Grouped Replies from Instagram App directly (Filter duplicates from Dashboard) */}
-                            {externalReplies[comment.id] && externalReplies[comment.id]
-                                .filter(reply => {
-                                    // If we have it in responses, it's a duplicate of a dashboard-sent message
-                                    const isDashDuplicate = responses[comment.id]?.some(r => r.id === reply.id);
-                                    return !isDashDuplicate;
-                                })
-                                .map(reply => (
+                                    <p className="comment-text">{comment.text}</p>
+
+                                    {!isEffectivelyReplied && (
+                                        <button
+                                            className="reply-btn"
+                                            onClick={() => setSelectedComment(comment)}
+                                        >
+                                            Responder
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Grouped Replies from our Dashboard */}
+                                {responses[comment.id] && responses[comment.id].map(reply => (
                                     <div key={reply.id} className="comment-reply-card">
                                         <div className="reply-connector"></div>
-                                        <div className="reply-content external-reply">
+                                        <div className="reply-content dashboard-reply">
                                             <div className="comment-header">
-                                                <span className={`comment-username ${reply.from?.username === BUSINESS_USERNAME ? 'admin-name' : ''}`}>
-                                                    @{reply.from?.username}
+                                                <span className="comment-username admin-name">
+                                                    Tú (vía Dashboard)
                                                 </span>
                                                 <span className="comment-time">
-                                                    {formatDate(reply.createdAt)}
+                                                    {formatDate(reply.sentAt)}
                                                 </span>
                                             </div>
-                                            <p className="comment-text">{reply.text}</p>
+                                            <p className="comment-text">{reply.message}</p>
                                         </div>
                                     </div>
                                 ))}
-                        </div>
-                    ))}
+
+                                {/* Grouped Replies from Instagram App directly (Filter duplicates from Dashboard) */}
+                                {externalReplies[comment.id] && externalReplies[comment.id]
+                                    .filter(reply => {
+                                        // If we have it in responses, it's a duplicate of a dashboard-sent message
+                                        const isDashDuplicate = responses[comment.id]?.some(r => r.id === reply.id);
+                                        return !isDashDuplicate;
+                                    })
+                                    .map(reply => (
+                                        <div key={reply.id} className="comment-reply-card">
+                                            <div className="reply-connector"></div>
+                                            <div className="reply-content external-reply">
+                                                <div className="comment-header">
+                                                    <span className={`comment-username ${reply.from?.username === BUSINESS_USERNAME ? 'admin-name' : ''}`}>
+                                                        @{reply.from?.username}
+                                                    </span>
+                                                    <span className="comment-time">
+                                                        {formatDate(reply.createdAt)}
+                                                    </span>
+                                                </div>
+                                                <p className="comment-text">{reply.text}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
 
