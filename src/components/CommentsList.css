@@ -134,6 +134,36 @@
   border-left: 3px solid #fcb045;
 }
 
+.comment-body {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  align-items: flex-start;
+}
+
+.comment-main-content {
+  flex: 1;
+}
+
+.comment-media-preview {
+  flex-shrink: 0;
+}
+
+.media-thumb {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.media-thumb:hover {
+  transform: scale(1.05);
+  border-color: #a855f7;
+}
+
 .comment-card.replied {
   border-left: 3px solid #4caf50;
   opacity: 0.9;

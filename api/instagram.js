@@ -117,8 +117,9 @@ async function processComment(commentData, igAccountId) {
         return;
     }
 
-    // Try to fetch Media Permalink
+    // Try to fetch Media Permalink and Thumbnail
     let permalink = null;
+    let mediaPreview = null;
     if (mediaId) {
         try {
             let token = process.env.META_ACCESS_TOKEN?.trim() || '';
@@ -127,13 +128,15 @@ async function processComment(commentData, igAccountId) {
             }
             const mediaRes = await axios.get(`https://graph.instagram.com/v21.0/${mediaId}`, {
                 params: {
-                    fields: 'permalink',
+                    fields: 'permalink,media_url,thumbnail_url,media_type',
                     access_token: token
                 }
             });
             permalink = mediaRes.data.permalink;
+            // Best preview: thumbnail_url for videos, media_url for the rest
+            mediaPreview = mediaRes.data.thumbnail_url || mediaRes.data.media_url;
         } catch (err) {
-            console.error(`⚠️ Could not fetch permalink for media ${mediaId}:`, err.message);
+            console.error(`⚠️ Could not fetch details for media ${mediaId}:`, err.message);
         }
     }
 
@@ -144,6 +147,7 @@ async function processComment(commentData, igAccountId) {
         text: commentData.text || '',
         mediaId: mediaId,
         mediaPermalink: permalink,
+        mediaPreview: mediaPreview,
         mediaProductType: commentData.media?.media_product_type || null,
         from: {
             id: commentData.from?.id || null,
@@ -158,7 +162,7 @@ async function processComment(commentData, igAccountId) {
 
     // Save to Firestore
     await db.collection('instagram_comments').doc(commentId).set(commentDoc);
-    console.log(`✅ Saved comment ${commentId} with permalink: ${permalink}`);
+    console.log(`✅ Saved comment ${commentId} with preview: ${mediaPreview}`);
 
     // If it's a reply, update the parent comment's status
     if (parentId) {

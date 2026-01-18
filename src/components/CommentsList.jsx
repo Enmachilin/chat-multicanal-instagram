@@ -20,8 +20,9 @@ export default function CommentsList() {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all'); // 'all', 'pending', 'replied'
     const [selectedComment, setSelectedComment] = useState(null);
+    const [externalReplies, setExternalReplies] = useState({});
 
-    // Load responses once
+    // Load dashboard responses
     useEffect(() => {
         const q = query(collection(db, 'instagram_responses'), orderBy('sentAt', 'asc'));
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -42,8 +43,8 @@ export default function CommentsList() {
         return () => unsubscribe();
     }, []);
 
+    // Load comments and app replies
     useEffect(() => {
-        // Query ALL comments to build the hierarchy
         let q = query(
             collection(db, 'instagram_comments'),
             orderBy('createdAt', 'desc'),
@@ -73,11 +74,9 @@ export default function CommentsList() {
                 createdAt: doc.data().createdAt?.toDate?.() || new Date(),
             }));
 
-            // Separate top-level comments from replies made via Instagram App
             const topLevel = allItems.filter(c => !c.parentId);
             const appReplies = allItems.filter(c => c.parentId);
 
-            // Group app replies by parentId
             const appRepliesMap = {};
             appReplies.forEach(r => {
                 if (!appRepliesMap[r.parentId]) appRepliesMap[r.parentId] = [];
@@ -95,8 +94,6 @@ export default function CommentsList() {
         return () => unsubscribe();
     }, [filter]);
 
-    const [externalReplies, setExternalReplies] = useState({});
-
     const handleReplySuccess = () => {
         setSelectedComment(null);
     };
@@ -110,12 +107,10 @@ export default function CommentsList() {
         );
     }
 
-    // Standard username of the business to identify own replies in the app
     const BUSINESS_USERNAME = 'mundocuarzos';
 
     return (
         <div className="comments-container">
-            {/* Filter Tabs */}
             <div className="comments-filters">
                 <button
                     className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
@@ -137,7 +132,6 @@ export default function CommentsList() {
                 </button>
             </div>
 
-            {/* Comments List */}
             {comments.length === 0 ? (
                 <div className="comments-empty">
                     <p>No hay comentarios {filter !== 'all' ? `(${filter})` : ''}</p>
@@ -145,7 +139,6 @@ export default function CommentsList() {
             ) : (
                 <div className="comments-list">
                     {comments.map(comment => {
-                        // Smart Status: A comment is replied if marked true OR if it has children in UI
                         const hasDashboardReply = responses[comment.id] && responses[comment.id].length > 0;
                         const hasExternalReply = externalReplies[comment.id] && externalReplies[comment.id].filter(reply => {
                             const isDashDuplicate = responses[comment.id]?.some(r => r.id === reply.id);
@@ -156,25 +149,12 @@ export default function CommentsList() {
 
                         return (
                             <div key={comment.id} className="comment-group">
-                                {/* Original Comment */}
-                                <div
-                                    className={`comment-card ${isEffectivelyReplied ? 'replied' : 'pending'}`}
-                                >
+                                <div className={`comment-card ${isEffectivelyReplied ? 'replied' : 'pending'}`}>
                                     <div className="comment-header">
-                                        <span className="comment-username">
-                                            @{comment.from?.username || 'usuario'}
-                                        </span>
-                                        <span className="comment-time">
-                                            {formatDate(comment.createdAt)}
-                                        </span>
+                                        <span className="comment-username">@{comment.from?.username || 'usuario'}</span>
+                                        <span className="comment-time">{formatDate(comment.createdAt)}</span>
                                         {comment.mediaPermalink && (
-                                            <a
-                                                href={comment.mediaPermalink}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="view-post-link"
-                                                title="Ver publicación original"
-                                            >
+                                            <a href={comment.mediaPermalink} target="_blank" rel="noopener noreferrer" className="view-post-link">
                                                 🔗 Ver Post
                                             </a>
                                         )}
@@ -183,43 +163,43 @@ export default function CommentsList() {
                                         </span>
                                     </div>
 
-                                    <p className="comment-text">{comment.text}</p>
-
-                                    {!isEffectivelyReplied && (
-                                        <button
-                                            className="reply-btn"
-                                            onClick={() => setSelectedComment(comment)}
-                                        >
-                                            Responder
-                                        </button>
-                                    )}
+                                    <div className="comment-body">
+                                        <div className="comment-main-content">
+                                            <p className="comment-text">{comment.text}</p>
+                                            {!isEffectivelyReplied && (
+                                                <button className="reply-btn" onClick={() => setSelectedComment(comment)}>
+                                                    Responder
+                                                </button>
+                                            )}
+                                        </div>
+                                        {comment.mediaPreview && (
+                                            <div className="comment-media-preview">
+                                                <img
+                                                    src={comment.mediaPreview}
+                                                    alt="Post Preview"
+                                                    className="media-thumb"
+                                                    onClick={() => comment.mediaPermalink && window.open(comment.mediaPermalink, '_blank')}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
-                                {/* Grouped Replies from our Dashboard */}
                                 {responses[comment.id] && responses[comment.id].map(reply => (
                                     <div key={reply.id} className="comment-reply-card">
                                         <div className="reply-connector"></div>
                                         <div className="reply-content dashboard-reply">
                                             <div className="comment-header">
-                                                <span className="comment-username admin-name">
-                                                    Tú (vía Dashboard)
-                                                </span>
-                                                <span className="comment-time">
-                                                    {formatDate(reply.sentAt)}
-                                                </span>
+                                                <span className="comment-username admin-name">Tú (vía Dashboard)</span>
+                                                <span className="comment-time">{formatDate(reply.sentAt)}</span>
                                             </div>
                                             <p className="comment-text">{reply.message}</p>
                                         </div>
                                     </div>
                                 ))}
 
-                                {/* Grouped Replies from Instagram App directly (Filter duplicates from Dashboard) */}
                                 {externalReplies[comment.id] && externalReplies[comment.id]
-                                    .filter(reply => {
-                                        // If we have it in responses, it's a duplicate of a dashboard-sent message
-                                        const isDashDuplicate = responses[comment.id]?.some(r => r.id === reply.id);
-                                        return !isDashDuplicate;
-                                    })
+                                    .filter(reply => !responses[comment.id]?.some(r => r.id === reply.id))
                                     .map(reply => (
                                         <div key={reply.id} className="comment-reply-card">
                                             <div className="reply-connector"></div>
@@ -228,9 +208,7 @@ export default function CommentsList() {
                                                     <span className={`comment-username ${reply.from?.username === BUSINESS_USERNAME ? 'admin-name' : ''}`}>
                                                         @{reply.from?.username}
                                                     </span>
-                                                    <span className="comment-time">
-                                                        {formatDate(reply.createdAt)}
-                                                    </span>
+                                                    <span className="comment-time">{formatDate(reply.createdAt)}</span>
                                                 </div>
                                                 <p className="comment-text">{reply.text}</p>
                                             </div>
@@ -242,13 +220,10 @@ export default function CommentsList() {
                 </div>
             )}
 
-            {/* Reply Modal */}
             {selectedComment && (
                 <div className="reply-modal-overlay" onClick={() => setSelectedComment(null)}>
                     <div className="reply-modal" onClick={e => e.stopPropagation()}>
-                        <button className="modal-close" onClick={() => setSelectedComment(null)}>
-                            ×
-                        </button>
+                        <button className="modal-close" onClick={() => setSelectedComment(null)}>×</button>
                         <ReplyForm
                             comment={selectedComment}
                             onSuccess={handleReplySuccess}
@@ -265,15 +240,8 @@ function formatDate(date) {
     if (!date) return '';
     const now = new Date();
     const diff = now - date;
-
     if (diff < 60000) return 'Ahora';
     if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
     if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`;
-
-    return date.toLocaleDateString('es', {
-        day: 'numeric',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
+    return date.toLocaleDateString('es', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
