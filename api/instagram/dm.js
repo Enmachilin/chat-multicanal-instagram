@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { recipientId, message } = req.body;
+        const { recipientId, message, commentId } = req.body;
 
         // Validate input
         if (!recipientId || !message) {
@@ -26,36 +26,55 @@ export default async function handler(req, res) {
             });
         }
 
-        if (message.length > 1000) {
-            return res.status(400).json({
-                error: 'Message exceeds maximum length of 1000 characters'
-            });
-        }
-
-        // Clean token (Vercel sometimes adds quotes)
+        // Clean token
         let token = process.env.META_ACCESS_TOKEN?.trim() || '';
         if (token.startsWith('"') && token.endsWith('"')) {
             token = token.substring(1, token.length - 1);
         }
 
-        // Send DM via Instagram API (matching the user's working curl precisely)
-        const response = await axios.post(
-            `${GRAPH_API_BASE}/me/messages`,
-            {
-                // Ensure recipient ID is handled as a number if possible, matching the curl's format
-                recipient: JSON.stringify({ id: parseInt(recipientId) || recipientId }),
-                message: JSON.stringify({ text: message })
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                timeout: 15000,
-            }
-        );
+        let messageId = null;
+        let usedPrivateReply = false;
 
-        const messageId = response.data.message_id;
+        try {
+            // 1. Try standard DM (me/messages)
+            const response = await axios.post(
+                `${GRAPH_API_BASE}/me/messages`,
+                {
+                    recipient: JSON.stringify({ id: parseInt(recipientId) || recipientId }),
+                    message: JSON.stringify({ text: message })
+                },
+                {
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    timeout: 15000,
+                }
+            );
+            messageId = response.data.message_id;
+        } catch (dmError) {
+            const igErrorMsg = dmError.response?.data?.error?.message || '';
+            const isWindowError = igErrorMsg.includes('window') || igErrorMsg.includes('policy');
+
+            // 2. Fallback: If window is closed and we have a commentId, try Private Reply
+            if (isWindowError && commentId) {
+                console.log(`⚠️ Window closed for ${recipientId}. Attempting Private Reply for comment ${commentId}...`);
+                try {
+                    const prResponse = await axios.post(
+                        `https://graph.instagram.com/v21.0/${commentId}/private_replies`,
+                        { message: message },
+                        {
+                            params: { access_token: token },
+                            timeout: 15000,
+                        }
+                    );
+                    messageId = prResponse.data.id; // Private replies return 'id'
+                    usedPrivateReply = true;
+                } catch (prError) {
+                    console.error('❌ Private Reply fallback failed:', prError.response?.data || prError.message);
+                    throw dmError; // Re-throw the original window error if fallback fails
+                }
+            } else {
+                throw dmError;
+            }
+        }
 
         // Save sent message to Firestore (Unified History)
         const messageDoc = {
@@ -64,6 +83,7 @@ export default async function handler(req, res) {
             fromMe: true,
             participantId: recipientId,
             igAccountId: process.env.INSTAGRAM_ACCOUNT_ID,
+            usedPrivateReply: usedPrivateReply,
             createdAt: FieldValue.serverTimestamp(),
         };
 

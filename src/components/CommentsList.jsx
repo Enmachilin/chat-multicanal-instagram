@@ -23,9 +23,9 @@ export default function CommentsList({ onStartDirectChat }) {
     const [externalReplies, setExternalReplies] = useState({});
 
     // Handle jumping to DM
-    const handleStartChat = (participantId, username) => {
+    const handleStartChat = (participantId, username, commentId) => {
         if (onStartDirectChat) {
-            onStartDirectChat({ id: participantId, username });
+            onStartDirectChat({ id: participantId, username, commentId });
         }
     };
 
@@ -181,7 +181,7 @@ export default function CommentsList({ onStartDirectChat }) {
                                                 )}
                                                 <button
                                                     className="dm-btn"
-                                                    onClick={() => handleStartChat(comment.from?.id, comment.from?.username)}
+                                                    onClick={() => handleStartChat(comment.from?.id, comment.from?.username, comment.id)}
                                                     title="Enviar mensaje directo"
                                                 >
                                                     ✉️ Enviar DM

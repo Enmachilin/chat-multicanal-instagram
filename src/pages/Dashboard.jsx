@@ -43,7 +43,7 @@ export default function Dashboard() {
                             </svg>
                             <h2>Comentarios</h2>
                         </div>
-                        <CommentsList onStartDirectChat={(participantId) => setActiveConversationId(participantId)} />
+                        <CommentsList onStartDirectChat={({ id, username, commentId }) => setActiveConversationId({ id, username, commentId })} />
                     </section>
 
                     <section className="dashboard-column">

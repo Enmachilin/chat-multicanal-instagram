@@ -33,19 +33,24 @@ export default function MessagesList({ externalActiveId, onConversationCleared }
     // Handle external conversation activation (e.g., from CommentsList)
     useEffect(() => {
         if (externalActiveId && conversations.length > 0) {
-            const { id, username } = externalActiveId;
+            const { id, username, commentId } = externalActiveId;
             const targetConv = conversations.find(c => c.participantId === id);
 
             if (targetConv) {
-                setSelectedConversation(targetConv);
+                // If exiting conversation exists, we still might want to attach commentId 
+                // for the private_reply logic if the window is closed
+                setSelectedConversation({
+                    ...targetConv,
+                    replyToCommentId: commentId
+                });
             } else {
                 // If conversation doesn't exist, create a temporary "virtual" conversation
-                // This allows sending a message to a new user
                 setSelectedConversation({
                     id: `temp-${id}`,
                     participantId: id,
                     participantUsername: username || 'Nuevo Usuario',
-                    isVirtual: true, // Flag to indicate it's not in DB yet
+                    isVirtual: true,
+                    replyToCommentId: commentId, // Store specific comment to reply to
                     unreadCount: 0
                 });
             }
@@ -190,6 +195,7 @@ export default function MessagesList({ externalActiveId, onConversationCleared }
 
                         <DMReplyForm
                             recipientId={selectedConversation.participantId}
+                            commentId={selectedConversation.replyToCommentId}
                             onSuccess={handleReplySuccess}
                         />
                     </>

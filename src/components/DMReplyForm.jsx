@@ -4,7 +4,7 @@ import './DMReplyForm.css';
 /**
  * Form to send a DM reply to an Instagram user
  */
-export default function DMReplyForm({ recipientId, onSuccess }) {
+export default function DMReplyForm({ recipientId, commentId, onSuccess }) {
     const [message, setMessage] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -25,6 +25,7 @@ export default function DMReplyForm({ recipientId, onSuccess }) {
                 },
                 body: JSON.stringify({
                     recipientId: recipientId,
+                    commentId: commentId,
                     message: message.trim(),
                 }),
             });
