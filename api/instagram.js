@@ -108,6 +108,7 @@ function verifySignature(payload, signature) {
 async function processComment(commentData, igAccountId) {
     const commentId = commentData.id;
     const parentId = commentData.parent_id || null;
+    const mediaId = commentData.media?.id || null;
 
     // Check if comment already exists (idempotency)
     const existingDoc = await db.collection('instagram_comments').doc(commentId).get();
@@ -116,12 +117,33 @@ async function processComment(commentData, igAccountId) {
         return;
     }
 
+    // Try to fetch Media Permalink
+    let permalink = null;
+    if (mediaId) {
+        try {
+            let token = process.env.META_ACCESS_TOKEN?.trim() || '';
+            if (token.startsWith('"') && token.endsWith('"')) {
+                token = token.substring(1, token.length - 1);
+            }
+            const mediaRes = await axios.get(`https://graph.instagram.com/v21.0/${mediaId}`, {
+                params: {
+                    fields: 'permalink',
+                    access_token: token
+                }
+            });
+            permalink = mediaRes.data.permalink;
+        } catch (err) {
+            console.error(`⚠️ Could not fetch permalink for media ${mediaId}:`, err.message);
+        }
+    }
+
     // Build comment document
     const commentDoc = {
         id: commentId,
         type: 'comment',
         text: commentData.text || '',
-        mediaId: commentData.media?.id || null,
+        mediaId: mediaId,
+        mediaPermalink: permalink,
         mediaProductType: commentData.media?.media_product_type || null,
         from: {
             id: commentData.from?.id || null,
@@ -136,7 +158,7 @@ async function processComment(commentData, igAccountId) {
 
     // Save to Firestore
     await db.collection('instagram_comments').doc(commentId).set(commentDoc);
-    console.log(`✅ Saved comment ${commentId} from @${commentDoc.from.username}`);
+    console.log(`✅ Saved comment ${commentId} with permalink: ${permalink}`);
 
     // If it's a reply, update the parent comment's status
     if (parentId) {

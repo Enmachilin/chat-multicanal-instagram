@@ -197,6 +197,24 @@
   transition: all 0.2s ease;
 }
 
+.view-post-link {
+  color: #a855f7;
+  text-decoration: none;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  background: rgba(168, 85, 247, 0.1);
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.view-post-link:hover {
+  background: rgba(168, 85, 247, 0.2);
+  transform: translateY(-1px);
+}
+
 .reply-btn:hover {
   opacity: 0.9;
   transform: translateY(-1px);

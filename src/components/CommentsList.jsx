@@ -157,6 +157,17 @@ export default function CommentsList() {
                                     <span className="comment-time">
                                         {formatDate(comment.createdAt)}
                                     </span>
+                                    {comment.mediaPermalink && (
+                                        <a
+                                            href={comment.mediaPermalink}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="view-post-link"
+                                            title="Ver publicación original"
+                                        >
+                                            🔗 Ver Post
+                                        </a>
+                                    )}
                                     <span className={`comment-status ${comment.replied ? 'replied' : 'pending'}`}>
                                         {comment.replied ? '✓ Respondido' : '• Pendiente'}
                                     </span>
