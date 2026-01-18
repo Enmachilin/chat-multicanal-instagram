@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     collection,
     query,
@@ -19,6 +19,16 @@ export default function MessagesList() {
     const [messages, setMessages] = useState([]);
     const [selectedConversation, setSelectedConversation] = useState(null);
     const [loading, setLoading] = useState(true);
+    const messagesEndRef = useRef(null);
+
+    const scrollToBottom = () => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    // Auto scroll when messages change
+    useEffect(() => {
+        scrollToBottom();
+    }, [messages]);
 
     // Load conversations
     useEffect(() => {
@@ -135,12 +145,15 @@ export default function MessagesList() {
                             {messages.length === 0 ? (
                                 <p className="chat-empty">No hay mensajes</p>
                             ) : (
-                                messages.map(msg => (
-                                    <div key={msg.id} className={`message-bubble ${msg.fromMe ? 'outgoing' : 'incoming'}`}>
-                                        <p>{msg.text}</p>
-                                        <span className="message-time">{formatTime(msg.createdAt)}</span>
-                                    </div>
-                                ))
+                                <>
+                                    {messages.map(msg => (
+                                        <div key={msg.id} className={`message-bubble ${msg.fromMe ? 'outgoing' : 'incoming'}`}>
+                                            <p>{msg.text}</p>
+                                            <span className="message-time">{formatTime(msg.createdAt)}</span>
+                                        </div>
+                                    ))}
+                                    <div ref={messagesEndRef} />
+                                </>
                             )}
                         </div>
 
