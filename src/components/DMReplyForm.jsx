@@ -14,6 +14,8 @@ export default function DMReplyForm({ recipientId, commentId, onSuccess }) {
 
         if (!message.trim()) return;
 
+        console.log('📤 Sending DM:', { recipientId, commentId });
+
         setLoading(true);
         setError(null);
 

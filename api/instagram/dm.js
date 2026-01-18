@@ -37,10 +37,11 @@ export default async function handler(req, res) {
 
         try {
             // 1. Try standard DM (me/messages)
+            console.log(`💬 Attempting standard DM to ${recipientId}...`);
             const response = await axios.post(
                 `${GRAPH_API_BASE}/me/messages`,
                 {
-                    recipient: JSON.stringify({ id: parseInt(recipientId) || recipientId }),
+                    recipient: JSON.stringify({ id: recipientId }),
                     message: JSON.stringify({ text: message })
                 },
                 {
@@ -50,28 +51,45 @@ export default async function handler(req, res) {
             );
             messageId = response.data.message_id;
         } catch (dmError) {
-            const igErrorMsg = dmError.response?.data?.error?.message || '';
-            const isWindowError = igErrorMsg.includes('window') || igErrorMsg.includes('policy');
+            const igError = dmError.response?.data?.error || {};
+            const igErrorMsg = igError.message || '';
+            const igCode = igError.code;
+            const igSubcode = igError.error_subcode;
+
+            // Window error detection: Code 10, subcode 2018278 or message text
+            const isWindowError =
+                igCode === 10 ||
+                igSubcode === 2018278 ||
+                igErrorMsg.toLowerCase().includes('window') ||
+                igErrorMsg.toLowerCase().includes('policy');
+
+            console.log(`ℹ️ DM Failed. Code: ${igCode}, Subcode: ${igSubcode}, Msg: ${igErrorMsg}`);
 
             // 2. Fallback: If window is closed and we have a commentId, try Private Reply
             if (isWindowError && commentId) {
-                console.log(`⚠️ Window closed for ${recipientId}. Attempting Private Reply for comment ${commentId}...`);
+                console.log(`⚠️ Window closed for ${recipientId}. Attempting Private Reply for comment ${commentId} via FB Graph...`);
                 try {
+                    // Use graph.facebook.com for private_replies (standard for integrations)
                     const prResponse = await axios.post(
-                        `https://graph.instagram.com/v21.0/${commentId}/private_replies`,
+                        `https://graph.facebook.com/v21.0/${commentId}/private_replies`,
                         { message: message },
                         {
                             params: { access_token: token },
+                            headers: { 'Content-Type': 'application/json' },
                             timeout: 15000,
                         }
                     );
-                    messageId = prResponse.data.id; // Private replies return 'id'
+                    messageId = prResponse.data.id;
                     usedPrivateReply = true;
+                    console.log(`✅ Private Reply Sent! ID: ${messageId}`);
                 } catch (prError) {
                     console.error('❌ Private Reply fallback failed:', prError.response?.data || prError.message);
-                    throw dmError; // Re-throw the original window error if fallback fails
+                    throw dmError; // Re-throw the original window error
                 }
             } else {
+                if (!commentId && isWindowError) {
+                    console.log('❌ Window error detected but no commentId provided for fallback.');
+                }
                 throw dmError;
             }
         }
