@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Instagram comments - read from frontend, write only from server
+    match /instagram_comments/{commentId} {
+      allow read: if true; // Authenticated users can read
+      allow write: if false; // Only server can write (via Admin SDK)
+    }
+    
+    // Instagram responses - read from frontend, write only from server
+    match /instagram_responses/{responseId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

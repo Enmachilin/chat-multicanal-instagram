@@ -1,0 +1,36 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+dist/
+build/
+.vercel/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Firebase
+firebase-admin-key.json
+serviceAccountKey.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Temp
+.tmp/
