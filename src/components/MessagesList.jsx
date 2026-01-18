@@ -14,7 +14,7 @@ import './MessagesList.css';
 /**
  * Real-time list of Instagram DMs (conversations) from Firestore
  */
-export default function MessagesList() {
+export default function MessagesList({ externalActiveId, onConversationCleared }) {
     const [conversations, setConversations] = useState([]);
     const [messages, setMessages] = useState([]);
     const [selectedConversation, setSelectedConversation] = useState(null);
@@ -29,6 +29,18 @@ export default function MessagesList() {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    // Handle external conversation activation (e.g., from CommentsList)
+    useEffect(() => {
+        if (externalActiveId && conversations.length > 0) {
+            const targetConv = conversations.find(c => c.participantId === externalActiveId);
+            if (targetConv) {
+                setSelectedConversation(targetConv);
+                // Clear the external activation once handled
+                onConversationCleared();
+            }
+        }
+    }, [externalActiveId, conversations, onConversationCleared]);
 
     // Load conversations
     useEffect(() => {

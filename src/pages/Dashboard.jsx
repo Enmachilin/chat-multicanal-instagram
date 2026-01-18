@@ -8,6 +8,9 @@ import './Dashboard.css';
  * Main page for viewing and responding to Instagram comments and DMs
  */
 export default function Dashboard() {
+    // Shared state to allow CommentsList to trigger conversation change in MessagesList
+    const [activeConversationId, setActiveConversationId] = useState(null);
+
     return (
         <div className="dashboard">
             {/* Header */}
@@ -40,7 +43,7 @@ export default function Dashboard() {
                             </svg>
                             <h2>Comentarios</h2>
                         </div>
-                        <CommentsList />
+                        <CommentsList onStartDirectChat={(participantId) => setActiveConversationId(participantId)} />
                     </section>
 
                     <section className="dashboard-column">
@@ -51,7 +54,10 @@ export default function Dashboard() {
                             </svg>
                             <h2>Mensajes DM</h2>
                         </div>
-                        <MessagesList />
+                        <MessagesList
+                            externalActiveId={activeConversationId}
+                            onConversationCleared={() => setActiveConversationId(null)}
+                        />
                     </section>
                 </div>
             </main>

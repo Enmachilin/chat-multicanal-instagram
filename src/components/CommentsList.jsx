@@ -14,13 +14,20 @@ import './CommentsList.css';
 /**
  * Real-time list of Instagram comments from Firestore
  */
-export default function CommentsList() {
+export default function CommentsList({ onStartDirectChat }) {
     const [comments, setComments] = useState([]);
     const [responses, setResponses] = useState({});
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all'); // 'all', 'pending', 'replied'
     const [selectedComment, setSelectedComment] = useState(null);
     const [externalReplies, setExternalReplies] = useState({});
+
+    // Handle jumping to DM
+    const handleStartChat = (participantId) => {
+        if (onStartDirectChat) {
+            onStartDirectChat(participantId);
+        }
+    };
 
     // Load dashboard responses
     useEffect(() => {
@@ -166,11 +173,20 @@ export default function CommentsList() {
                                     <div className="comment-body">
                                         <div className="comment-main-content">
                                             <p className="comment-text">{comment.text}</p>
-                                            {!isEffectivelyReplied && (
-                                                <button className="reply-btn" onClick={() => setSelectedComment(comment)}>
-                                                    Responder
+                                            <div className="comment-actions">
+                                                {!isEffectivelyReplied && (
+                                                    <button className="reply-btn" onClick={() => setSelectedComment(comment)}>
+                                                        Responder
+                                                    </button>
+                                                )}
+                                                <button
+                                                    className="dm-btn"
+                                                    onClick={() => handleStartChat(comment.from?.id)}
+                                                    title="Enviar mensaje directo"
+                                                >
+                                                    ✉️ Enviar DM
                                                 </button>
-                                            )}
+                                            </div>
                                         </div>
                                         {comment.mediaPreview && (
                                             <div className="comment-media-preview">
