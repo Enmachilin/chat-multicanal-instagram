@@ -42,6 +42,12 @@ export default async function handler(req, res) {
 
             const body = req.body;
 
+            // Check if Firebase is initialized
+            if (!db) {
+                console.error('❌ Firestore not initialized. Check your environment variables.');
+                return res.status(500).json({ error: 'Firestore connection failed' });
+            }
+
             // Check if it's an Instagram event
             if (body.object !== 'instagram') {
                 return res.status(200).json({ received: true, ignored: true });
