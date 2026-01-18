@@ -32,17 +32,23 @@ export default async function handler(req, res) {
             });
         }
 
-        // Send DM via Instagram API (matching the user's working curl)
+        // Clean token (Vercel sometimes adds quotes)
+        let token = process.env.META_ACCESS_TOKEN?.trim() || '';
+        if (token.startsWith('"') && token.endsWith('"')) {
+            token = token.substring(1, token.length - 1);
+        }
+
+        // Send DM via Instagram API (matching the user's working curl precisely)
         const response = await axios.post(
             `${GRAPH_API_BASE}/me/messages`,
             {
-                // Note: The user's curl uses stringified JSON for these fields
-                recipient: JSON.stringify({ id: recipientId }),
+                // Ensure recipient ID is handled as a number if possible, matching the curl's format
+                recipient: JSON.stringify({ id: parseInt(recipientId) || recipientId }),
                 message: JSON.stringify({ text: message })
             },
             {
                 headers: {
-                    'Authorization': `Bearer ${process.env.META_ACCESS_TOKEN?.trim()}`,
+                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
                 timeout: 15000,
