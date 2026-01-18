@@ -33,12 +33,24 @@ export default function MessagesList({ externalActiveId, onConversationCleared }
     // Handle external conversation activation (e.g., from CommentsList)
     useEffect(() => {
         if (externalActiveId && conversations.length > 0) {
-            const targetConv = conversations.find(c => c.participantId === externalActiveId);
+            const { id, username } = externalActiveId;
+            const targetConv = conversations.find(c => c.participantId === id);
+
             if (targetConv) {
                 setSelectedConversation(targetConv);
-                // Clear the external activation once handled
-                onConversationCleared();
+            } else {
+                // If conversation doesn't exist, create a temporary "virtual" conversation
+                // This allows sending a message to a new user
+                setSelectedConversation({
+                    id: `temp-${id}`,
+                    participantId: id,
+                    participantUsername: username || 'Nuevo Usuario',
+                    isVirtual: true, // Flag to indicate it's not in DB yet
+                    unreadCount: 0
+                });
             }
+            // Clear the external activation once handled
+            onConversationCleared();
         }
     }, [externalActiveId, conversations, onConversationCleared]);
 
@@ -155,7 +167,14 @@ export default function MessagesList({ externalActiveId, onConversationCleared }
 
                         <div className="chat-messages">
                             {messages.length === 0 ? (
-                                <p className="chat-empty">No hay mensajes</p>
+                                selectedConversation.isVirtual ? (
+                                    <div className="chat-welcome">
+                                        <p>✨ Estás iniciando una conversación nueva con <strong>@{selectedConversation.participantUsername}</strong></p>
+                                        <p className="chat-subtext">Escribe tu primer mensaje abajo para enviarlo.</p>
+                                    </div>
+                                ) : (
+                                    <p className="chat-empty">No hay mensajes</p>
+                                )
                             ) : (
                                 <>
                                     {messages.map(msg => (
