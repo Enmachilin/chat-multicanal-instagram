@@ -158,14 +158,18 @@ async function processComment(commentData, igAccountId) {
  * Process and store a Direct Message in Firestore
  */
 async function processDirectMessage(messagingEvent, igAccountId) {
-    // Only process incoming messages (not echo of sent messages)
-    if (!messagingEvent.message || messagingEvent.message.is_echo) {
-        return;
-    }
+    if (!messagingEvent.message) return;
 
+    const isEcho = messagingEvent.message.is_echo || false;
     const messageId = messagingEvent.message.mid;
+
+    // Determine who the other person is (the participant)
+    // If it's an echo, we sent it, so the participant is the recipient.
+    // If it's not an echo, they sent it, so the participant is the sender.
+    const participantId = isEcho ? messagingEvent.recipient?.id : messagingEvent.sender?.id;
     const senderId = messagingEvent.sender?.id;
-    const recipientId = messagingEvent.recipient?.id;
+
+    if (!participantId) return;
 
     // Check if message already exists (idempotency)
     const existingDoc = await db.collection('instagram_messages').doc(messageId).get();
@@ -174,7 +178,7 @@ async function processDirectMessage(messagingEvent, igAccountId) {
         return;
     }
 
-    // Try to fetch username from Meta
+    // Try to fetch username for the participant from Meta if we don't have it
     let username = null;
     try {
         let token = process.env.META_ACCESS_TOKEN?.trim() || '';
@@ -182,7 +186,7 @@ async function processDirectMessage(messagingEvent, igAccountId) {
             token = token.substring(1, token.length - 1);
         }
 
-        const userResponse = await axios.get(`https://graph.instagram.com/v21.0/${senderId}`, {
+        const userResponse = await axios.get(`https://graph.instagram.com/v21.0/${participantId}`, {
             params: {
                 fields: 'username',
                 access_token: token
@@ -190,7 +194,7 @@ async function processDirectMessage(messagingEvent, igAccountId) {
         });
         username = userResponse.data.username;
     } catch (err) {
-        console.error(`⚠️ Could not fetch username for ${senderId}:`, err.message);
+        console.error(`⚠️ Could not fetch username for ${participantId}:`, err.message);
     }
 
     // Build message document (Unified History)
@@ -198,15 +202,14 @@ async function processDirectMessage(messagingEvent, igAccountId) {
         id: messageId,
         type: 'dm',
         text: messagingEvent.message.text || '',
-        fromMe: false,
-        participantId: senderId,
+        fromMe: isEcho, // If it's an echo, it came FROM US
+        participantId: participantId,
         participantUsername: username,
-        attachments: messagingEvent.message.attachments || [],
         from: {
             id: senderId,
-            username: username
+            username: isEcho ? 'Me' : username
         },
-        recipientId: recipientId,
+        recipientId: messagingEvent.recipient?.id,
         igAccountId: igAccountId,
         timestamp: messagingEvent.timestamp ? new Date(messagingEvent.timestamp) : null,
         createdAt: FieldValue.serverTimestamp(),
@@ -215,30 +218,36 @@ async function processDirectMessage(messagingEvent, igAccountId) {
 
     // Save to Firestore
     await db.collection('instagram_messages').doc(messageId).set(messageDoc);
-    console.log(`✅ Saved DM ${messageId} from ${username || senderId}`);
+    console.log(`✅ Saved DM ${messageId} (Echo: ${isEcho}) with ${username || participantId}`);
 
     // Also update/create conversation thread
-    await updateConversation(senderId, username, igAccountId, messageDoc);
+    await updateConversation(participantId, username, igAccountId, messageDoc);
 }
 
 /**
  * Update or create a conversation thread for DMs
  */
-async function updateConversation(senderId, username, igAccountId, messageDoc) {
-    const conversationId = `${igAccountId}_${senderId}`;
+async function updateConversation(participantId, username, igAccountId, messageDoc) {
+    const conversationId = `${igAccountId}_${participantId}`;
     const conversationRef = db.collection('instagram_conversations').doc(conversationId);
 
     const updateData = {
         igAccountId: igAccountId,
-        participantId: senderId,
+        participantId: participantId,
         lastMessage: {
             text: messageDoc.text,
             timestamp: messageDoc.createdAt,
-            fromUs: false,
+            fromUs: messageDoc.fromMe,
         },
-        unreadCount: FieldValue.increment(1),
         updatedAt: FieldValue.serverTimestamp(),
     };
+
+    // Only increment unread if it's NOT an echo (i.e., it's an incoming message)
+    if (!messageDoc.fromMe) {
+        updateData.unreadCount = FieldValue.increment(1);
+    } else {
+        updateData.unreadCount = 0; // Reset unread if we are the ones sending
+    }
 
     if (username) {
         updateData.participantUsername = username;
