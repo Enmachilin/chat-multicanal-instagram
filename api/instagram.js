@@ -108,7 +108,6 @@ function verifySignature(payload, signature) {
 async function processComment(commentData, igAccountId) {
     const commentId = commentData.id;
     const parentId = commentData.parent_id || null;
-    const isFromOwner = commentData.from?.id === igAccountId || commentData.from?.username === 'mundocuarzos'; // Fallback check
 
     // Check if comment already exists (idempotency)
     const existingDoc = await db.collection('instagram_comments').doc(commentId).get();
@@ -130,26 +129,28 @@ async function processComment(commentData, igAccountId) {
         },
         parentId: parentId,
         igAccountId: igAccountId,
-        replied: isFromOwner, // If the owner is commenting, it doesn't need a reply status
-        isAdmin: isFromOwner,
+        replied: false,
         createdAt: FieldValue.serverTimestamp(),
         receivedAt: FieldValue.serverTimestamp(),
     };
 
     // Save to Firestore
     await db.collection('instagram_comments').doc(commentId).set(commentDoc);
-    console.log(`✅ Saved comment ${commentId} from @${commentDoc.from?.username}`);
+    console.log(`✅ Saved comment ${commentId} from @${commentDoc.from.username}`);
 
-    // LOGIC FOR NESTING AND STATUS:
+    // If it's a reply, update the parent comment's status
     if (parentId) {
-        // 1. Mark parent as replied
-        await db.collection('instagram_comments').doc(parentId).update({
-            replied: true,
-            updatedAt: FieldValue.serverTimestamp()
-        }).catch(err => console.log('Parent comment not found for status update'));
+        try {
+            const parentRef = db.collection('instagram_comments').doc(parentId);
+            const parentDoc = await parentRef.get();
 
-        // 2. If it's a reply from Instagram app (not our dashboard)
-        // ensure it's linked correctly in the UI
+            if (parentDoc.exists) {
+                await parentRef.update({ replied: true });
+                console.log(`🔗 Updated parent comment ${parentId} status to REPLIED`);
+            }
+        } catch (err) {
+            console.error(`⚠️ Error updating parent comment ${parentId}:`, err.message);
+        }
     }
 }
 
