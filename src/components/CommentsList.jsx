@@ -15,12 +15,36 @@ import './CommentsList.css';
  */
 export default function CommentsList() {
     const [comments, setComments] = useState([]);
+    const [responses, setResponses] = useState({});
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all'); // 'all', 'pending', 'replied'
     const [selectedComment, setSelectedComment] = useState(null);
 
+    // Load responses once
     useEffect(() => {
-        // Build query based on filter
+        const q = query(collection(db, 'instagram_responses'), orderBy('sentAt', 'asc'));
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const resMap = {};
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                if (!resMap[data.originalCommentId]) {
+                    resMap[data.originalCommentId] = [];
+                }
+                resMap[data.originalCommentId].push({
+                    id: doc.id,
+                    ...data,
+                    sentAt: data.sentAt?.toDate?.() || new Date()
+                });
+            });
+            setResponses(resMap);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        // Build query based on filter (only for top-level comments or all based on logic)
+        // Note: In Instagram, comments with parentId are already replies. 
+        // We usually want to show top-level comments and nest their replies.
         let q = query(
             collection(db, 'instagram_comments'),
             orderBy('createdAt', 'desc')
@@ -40,7 +64,6 @@ export default function CommentsList() {
             );
         }
 
-        // Subscribe to real-time updates
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const commentsData = snapshot.docs.map(doc => ({
                 id: doc.id,
@@ -102,32 +125,51 @@ export default function CommentsList() {
             ) : (
                 <div className="comments-list">
                     {comments.map(comment => (
-                        <div
-                            key={comment.id}
-                            className={`comment-card ${comment.replied ? 'replied' : 'pending'}`}
-                        >
-                            <div className="comment-header">
-                                <span className="comment-username">
-                                    @{comment.from?.username || 'usuario'}
-                                </span>
-                                <span className="comment-time">
-                                    {formatDate(comment.createdAt)}
-                                </span>
-                                <span className={`comment-status ${comment.replied ? 'replied' : 'pending'}`}>
-                                    {comment.replied ? '✓ Respondido' : '• Pendiente'}
-                                </span>
+                        <div key={comment.id} className="comment-group">
+                            <div
+                                className={`comment-card ${comment.replied ? 'replied' : 'pending'}`}
+                            >
+                                <div className="comment-header">
+                                    <span className="comment-username">
+                                        @{comment.from?.username || 'usuario'}
+                                    </span>
+                                    <span className="comment-time">
+                                        {formatDate(comment.createdAt)}
+                                    </span>
+                                    <span className={`comment-status ${comment.replied ? 'replied' : 'pending'}`}>
+                                        {comment.replied ? '✓ Respondido' : '• Pendiente'}
+                                    </span>
+                                </div>
+
+                                <p className="comment-text">{comment.text}</p>
+
+                                {!comment.replied && (
+                                    <button
+                                        className="reply-btn"
+                                        onClick={() => setSelectedComment(comment)}
+                                    >
+                                        Responder
+                                    </button>
+                                )}
                             </div>
 
-                            <p className="comment-text">{comment.text}</p>
-
-                            {!comment.replied && (
-                                <button
-                                    className="reply-btn"
-                                    onClick={() => setSelectedComment(comment)}
-                                >
-                                    Responder
-                                </button>
-                            )}
+                            {/* Grouped Replies from our system */}
+                            {responses[comment.id] && responses[comment.id].map(reply => (
+                                <div key={reply.id} className="comment-reply-card">
+                                    <div className="reply-connector"></div>
+                                    <div className="reply-content">
+                                        <div className="comment-header">
+                                            <span className="comment-username admin-name">
+                                                Tú (Respuesta)
+                                            </span>
+                                            <span className="comment-time">
+                                                {formatDate(reply.sentAt)}
+                                            </span>
+                                        </div>
+                                        <p className="comment-text">{reply.message}</p>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     ))}
                 </div>
