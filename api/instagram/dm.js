@@ -37,7 +37,7 @@ export default async function handler(req, res) {
 
         try {
             // 1. Try standard DM (me/messages)
-            console.log(`💬 Attempting standard DM to ${recipientId}...`);
+            console.log(`💬 [Step 1] Attempting standard DM to ${recipientId}...`);
             const response = await axios.post(
                 `${GRAPH_API_BASE}/me/messages`,
                 {
@@ -46,50 +46,75 @@ export default async function handler(req, res) {
                 },
                 {
                     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                    timeout: 15000,
+                    timeout: 10000,
                 }
             );
             messageId = response.data.message_id;
+            console.log(`✅ Standard DM successful: ${messageId}`);
         } catch (dmError) {
             const igError = dmError.response?.data?.error || {};
-            const igErrorMsg = igError.message || '';
-            const igCode = igError.code;
-            const igSubcode = igError.error_subcode;
+            const igMsg = igError.message || dmError.message;
+            console.log(`ℹ️ [Step 1 Fail] Standard DM blocked: ${igMsg} (Code: ${igError.code}, Subcode: ${igError.error_subcode})`);
 
-            // Window error detection: Code 10, subcode 2018278 or message text
-            const isWindowError =
-                igCode === 10 ||
-                igSubcode === 2018278 ||
-                igErrorMsg.toLowerCase().includes('window') ||
-                igErrorMsg.toLowerCase().includes('policy');
+            // If not a window error, don't even try fallback
+            const isWindowError = igError.code === 10 || igError.error_subcode === 2018278 || igMsg.toLowerCase().includes('window') || igMsg.toLowerCase().includes('policy');
 
-            console.log(`ℹ️ DM Failed. Code: ${igCode}, Subcode: ${igSubcode}, Msg: ${igErrorMsg}`);
-
-            // 2. Fallback: If window is closed and we have a commentId, try Private Reply
             if (isWindowError && commentId) {
-                console.log(`⚠️ Window closed for ${recipientId}. Attempting Private Reply for comment ${commentId} via FB Graph...`);
+                console.log(`⚠️ Window error detected. Triggering Private Reply Fallback...`);
+
+                // 2. Try Private Reply via Instagram Graph (Endpoint A)
                 try {
-                    // Use graph.facebook.com for private_replies (standard for integrations)
-                    const prResponse = await axios.post(
-                        `https://graph.facebook.com/v21.0/${commentId}/private_replies`,
+                    console.log(`💬 [Step 2] Attempting Private Reply (IG Graph) for comment ${commentId}...`);
+                    const prRes = await axios.post(
+                        `https://graph.instagram.com/v21.0/${commentId}/private_replies`,
                         { message: message },
                         {
                             params: { access_token: token },
-                            headers: { 'Content-Type': 'application/json' },
-                            timeout: 15000,
+                            timeout: 10000,
                         }
                     );
-                    messageId = prResponse.data.id;
+                    messageId = prRes.data.id;
                     usedPrivateReply = true;
-                    console.log(`✅ Private Reply Sent! ID: ${messageId}`);
-                } catch (prError) {
-                    console.error('❌ Private Reply fallback failed:', prError.response?.data || prError.message);
-                    throw dmError; // Re-throw the original window error
+                    console.log(`✅ Private Reply (IG Graph) successful: ${messageId}`);
+                } catch (prErrorA) {
+                    const prMsgA = prErrorA.response?.data?.error?.message || prErrorA.message;
+                    console.log(`ℹ️ [Step 2 Fail] IG Private Reply failed: ${prMsgA}`);
+
+                    // 3. Try Private Reply via Facebook Graph (Endpoint B - Final Stand)
+                    try {
+                        console.log(`💬 [Step 3] Attempting Private Reply (FB Graph) for comment ${commentId}...`);
+                        const prResB = await axios.post(
+                            `https://graph.facebook.com/v21.0/${commentId}/private_replies`,
+                            { message: message },
+                            {
+                                params: { access_token: token },
+                                headers: { 'Content-Type': 'application/json' },
+                                timeout: 10000,
+                            }
+                        );
+                        messageId = prResB.data.id;
+                        usedPrivateReply = true;
+                        console.log(`✅ Private Reply (FB Graph) successful: ${messageId}`);
+                    } catch (prErrorB) {
+                        const prMsgB = prErrorB.response?.data?.error?.message || prErrorB.message;
+                        console.error(`❌ [All Steps Failed] Could not open conversation:`, {
+                            standardDM: igMsg,
+                            privateReplyIG: prMsgA,
+                            privateReplyFB: prMsgB
+                        });
+
+                        // Throw a combined error so the USER knows exactly what happened
+                        return res.status(400).json({
+                            error: 'Impossible to send DM',
+                            details: {
+                                reason: 'Messaging window is closed and Private Reply failed on all endpoints.',
+                                debug: `IG Service says: ${prMsgA} | FB Service says: ${prMsgB}`
+                            }
+                        });
+                    }
                 }
             } else {
-                if (!commentId && isWindowError) {
-                    console.log('❌ Window error detected but no commentId provided for fallback.');
-                }
+                // Not a window error or no commentId, rethrow original
                 throw dmError;
             }
         }
