@@ -2,7 +2,7 @@ import axios from 'axios';
 import { db } from '../../lib/firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
-const GRAPH_API_VERSION = 'v24.0';
+const GRAPH_API_VERSION = 'v21.0';
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
 /**
@@ -32,6 +32,12 @@ export default async function handler(req, res) {
             });
         }
 
+        // Clean token (Vercel sometimes adds quotes)
+        let token = process.env.META_ACCESS_TOKEN?.trim() || '';
+        if (token.startsWith('"') && token.endsWith('"')) {
+            token = token.substring(1, token.length - 1);
+        }
+
         // Check if original comment exists
         const commentRef = db.collection('instagram_comments').doc(commentId);
         const commentDoc = await commentRef.get();
@@ -47,7 +53,9 @@ export default async function handler(req, res) {
             {
                 params: {
                     message: message,
-                    access_token: process.env.META_ACCESS_TOKEN,
+                },
+                headers: {
+                    'Authorization': `Bearer ${token}`
                 },
                 timeout: 15000,
             }
