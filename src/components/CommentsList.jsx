@@ -192,23 +192,29 @@ export default function CommentsList() {
                                 </div>
                             ))}
 
-                            {/* Grouped Replies from Instagram App directly */}
-                            {externalReplies[comment.id] && externalReplies[comment.id].map(reply => (
-                                <div key={reply.id} className="comment-reply-card">
-                                    <div className="reply-connector"></div>
-                                    <div className="reply-content external-reply">
-                                        <div className="comment-header">
-                                            <span className={`comment-username ${reply.from?.username === BUSINESS_USERNAME ? 'admin-name' : ''}`}>
-                                                @{reply.from?.username}
-                                            </span>
-                                            <span className="comment-time">
-                                                {formatDate(reply.createdAt)}
-                                            </span>
+                            {/* Grouped Replies from Instagram App directly (Filter duplicates from Dashboard) */}
+                            {externalReplies[comment.id] && externalReplies[comment.id]
+                                .filter(reply => {
+                                    // If we have it in responses, it's a duplicate of a dashboard-sent message
+                                    const isDashDuplicate = responses[comment.id]?.some(r => r.id === reply.id);
+                                    return !isDashDuplicate;
+                                })
+                                .map(reply => (
+                                    <div key={reply.id} className="comment-reply-card">
+                                        <div className="reply-connector"></div>
+                                        <div className="reply-content external-reply">
+                                            <div className="comment-header">
+                                                <span className={`comment-username ${reply.from?.username === BUSINESS_USERNAME ? 'admin-name' : ''}`}>
+                                                    @{reply.from?.username}
+                                                </span>
+                                                <span className="comment-time">
+                                                    {formatDate(reply.createdAt)}
+                                                </span>
+                                            </div>
+                                            <p className="comment-text">{reply.text}</p>
                                         </div>
-                                        <p className="comment-text">{reply.text}</p>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
                         </div>
                     ))}
                 </div>
