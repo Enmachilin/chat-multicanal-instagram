@@ -93,6 +93,10 @@ export default function CommentsList() {
         );
     }
 
+    // Separate main comments from replies
+    const mainComments = comments.filter(c => !c.parentId && !c.isAdmin);
+    const repliesFromIG = comments.filter(c => c.parentId);
+
     return (
         <div className="comments-container">
             {/* Filter Tabs */}
@@ -118,60 +122,72 @@ export default function CommentsList() {
             </div>
 
             {/* Comments List */}
-            {comments.length === 0 ? (
+            {mainComments.length === 0 ? (
                 <div className="comments-empty">
                     <p>No hay comentarios {filter !== 'all' ? `(${filter})` : ''}</p>
                 </div>
             ) : (
                 <div className="comments-list">
-                    {comments.map(comment => (
-                        <div key={comment.id} className="comment-group">
-                            <div
-                                className={`comment-card ${comment.replied ? 'replied' : 'pending'}`}
-                            >
-                                <div className="comment-header">
-                                    <span className="comment-username">
-                                        @{comment.from?.username || 'usuario'}
-                                    </span>
-                                    <span className="comment-time">
-                                        {formatDate(comment.createdAt)}
-                                    </span>
-                                    <span className={`comment-status ${comment.replied ? 'replied' : 'pending'}`}>
-                                        {comment.replied ? '✓ Respondido' : '• Pendiente'}
-                                    </span>
-                                </div>
+                    {mainComments.map(comment => {
+                        // Gather ALL replies: from our DB (dashboard) and from IG webhook
+                        const dashboardReplies = responses[comment.id] || [];
+                        const igReplies = repliesFromIG.filter(r => r.parentId === comment.id);
 
-                                <p className="comment-text">{comment.text}</p>
+                        // Merge and sort replies by time
+                        const allReplies = [
+                            ...dashboardReplies.map(r => ({ ...r, source: 'dashboard' })),
+                            ...igReplies.map(r => ({ ...r, source: 'instagram', sentAt: r.createdAt }))
+                        ].sort((a, b) => a.sentAt - b.sentAt);
 
-                                {!comment.replied && (
-                                    <button
-                                        className="reply-btn"
-                                        onClick={() => setSelectedComment(comment)}
-                                    >
-                                        Responder
-                                    </button>
-                                )}
-                            </div>
-
-                            {/* Grouped Replies from our system */}
-                            {responses[comment.id] && responses[comment.id].map(reply => (
-                                <div key={reply.id} className="comment-reply-card">
-                                    <div className="reply-connector"></div>
-                                    <div className="reply-content">
-                                        <div className="comment-header">
-                                            <span className="comment-username admin-name">
-                                                Tú (Respuesta)
-                                            </span>
-                                            <span className="comment-time">
-                                                {formatDate(reply.sentAt)}
-                                            </span>
-                                        </div>
-                                        <p className="comment-text">{reply.message}</p>
+                        return (
+                            <div key={comment.id} className="comment-group">
+                                <div
+                                    className={`comment-card ${comment.replied ? 'replied' : 'pending'}`}
+                                >
+                                    <div className="comment-header">
+                                        <span className="comment-username">
+                                            @{comment.from?.username || 'usuario'}
+                                        </span>
+                                        <span className="comment-time">
+                                            {formatDate(comment.createdAt)}
+                                        </span>
+                                        <span className={`comment-status ${comment.replied ? 'replied' : 'pending'}`}>
+                                            {comment.replied ? '✓ Respondido' : '• Pendiente'}
+                                        </span>
                                     </div>
+
+                                    <p className="comment-text">{comment.text}</p>
+
+                                    {!comment.replied && (
+                                        <button
+                                            className="reply-btn"
+                                            onClick={() => setSelectedComment(comment)}
+                                        >
+                                            Responder
+                                        </button>
+                                    )}
                                 </div>
-                            ))}
-                        </div>
-                    ))}
+
+                                {/* Grouped Replies */}
+                                {allReplies.map(reply => (
+                                    <div key={reply.id} className="comment-reply-card">
+                                        <div className="reply-connector"></div>
+                                        <div className="reply-content">
+                                            <div className="comment-header">
+                                                <span className={`comment-username ${reply.isAdmin || reply.source === 'dashboard' ? 'admin-name' : ''}`}>
+                                                    {reply.isAdmin || reply.source === 'dashboard' ? 'Tú (Respuesta)' : `@${reply.from?.username || 'usuario'}`}
+                                                </span>
+                                                <span className="comment-time">
+                                                    {formatDate(reply.sentAt)}
+                                                </span>
+                                            </div>
+                                            <p className="comment-text">{reply.message || reply.text}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
 
