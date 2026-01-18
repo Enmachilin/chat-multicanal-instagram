@@ -18,7 +18,7 @@ export default async function handler(req, res) {
         const challenge = req.query['hub.challenge'];
 
         if (mode === 'subscribe' && token === process.env.VERIFY_TOKEN) {
-            console.log('✅ Webhook verification successful');
+            console.log('✅ Webhook verification successful (v1.1)');
             return res.status(200).send(challenge);
         }
 
