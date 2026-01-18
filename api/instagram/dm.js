@@ -62,53 +62,57 @@ export default async function handler(req, res) {
             if (isWindowError && commentId) {
                 console.log(`⚠️ Window error detected. Triggering Private Reply Fallback...`);
 
-                // 2. Try Private Reply via Instagram Graph (Endpoint A)
+                // 2. Try Private Reply via Instagram Graph (Modern Method: recipient: { comment_id })
                 try {
-                    console.log(`💬 [Step 2] Attempting Private Reply (IG Graph) for comment ${commentId}...`);
+                    console.log(`💬 [Step 2] Attempting Private Reply via 'me/messages' with comment_id: ${commentId}...`);
                     const prRes = await axios.post(
-                        `https://graph.instagram.com/v21.0/${commentId}/private_replies`,
-                        { message: message },
+                        `${GRAPH_API_BASE}/me/messages`,
                         {
-                            params: { access_token: token },
+                            recipient: JSON.stringify({ comment_id: commentId }),
+                            message: JSON.stringify({ text: message })
+                        },
+                        {
+                            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
                             timeout: 10000,
                         }
                     );
-                    messageId = prRes.data.id;
+                    messageId = prRes.data.message_id || prRes.data.id;
                     usedPrivateReply = true;
-                    console.log(`✅ Private Reply (IG Graph) successful: ${messageId}`);
+                    console.log(`✅ Private Reply (Modern) successful: ${messageId}`);
                 } catch (prErrorA) {
                     const prMsgA = prErrorA.response?.data?.error?.message || prErrorA.message;
-                    console.log(`ℹ️ [Step 2 Fail] IG Private Reply failed: ${prMsgA}`);
+                    console.log(`ℹ️ [Step 2 Fail] Modern Private Reply failed: ${prMsgA}`);
 
-                    // 3. Try Private Reply via Facebook Graph (Endpoint B - Final Stand)
+                    // 3. Try Legacy Private Reply via Facebook Graph (Direct Object POST)
                     try {
-                        console.log(`💬 [Step 3] Attempting Private Reply (FB Graph) for comment ${commentId}...`);
+                        console.log(`💬 [Step 3] Attempting Legacy Private Reply (FB Graph) for comment ${commentId}...`);
                         const prResB = await axios.post(
                             `https://graph.facebook.com/v21.0/${commentId}/private_replies`,
                             { message: message },
                             {
-                                params: { access_token: token },
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: {
+                                    'Authorization': `Bearer ${token}`,
+                                    'Content-Type': 'application/json'
+                                },
                                 timeout: 10000,
                             }
                         );
                         messageId = prResB.data.id;
                         usedPrivateReply = true;
-                        console.log(`✅ Private Reply (FB Graph) successful: ${messageId}`);
+                        console.log(`✅ Legacy Private Reply (FB Graph) successful: ${messageId}`);
                     } catch (prErrorB) {
                         const prMsgB = prErrorB.response?.data?.error?.message || prErrorB.message;
                         console.error(`❌ [All Steps Failed] Could not open conversation:`, {
                             standardDM: igMsg,
-                            privateReplyIG: prMsgA,
-                            privateReplyFB: prMsgB
+                            modernPR: prMsgA,
+                            legacyPR: prMsgB
                         });
 
-                        // Throw a combined error so the USER knows exactly what happened
                         return res.status(400).json({
                             error: 'Impossible to send DM',
                             details: {
-                                reason: 'Messaging window is closed and Private Reply failed on all endpoints.',
-                                debug: `IG Service says: ${prMsgA} | FB Service says: ${prMsgB}`
+                                reason: 'Messaging window is closed and all Private Reply strategies failed.',
+                                debug: `Modern: ${prMsgA} | Legacy: ${prMsgB}`
                             }
                         });
                     }
