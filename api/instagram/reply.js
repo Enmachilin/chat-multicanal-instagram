@@ -3,7 +3,7 @@ import { db } from '../../lib/firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
 const GRAPH_API_VERSION = 'v21.0';
-const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+const GRAPH_API_BASE = `https://graph.instagram.com/${GRAPH_API_VERSION}`;
 
 /**
  * Reply to an Instagram comment
@@ -49,13 +49,13 @@ export default async function handler(req, res) {
         // Send reply to Instagram Graph API
         const response = await axios.post(
             `${GRAPH_API_BASE}/${commentId}/replies`,
-            null,
             {
-                params: {
-                    message: message,
-                },
+                message: message
+            },
+            {
                 headers: {
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
                 },
                 timeout: 15000,
             }
@@ -88,6 +88,9 @@ export default async function handler(req, res) {
         });
 
     } catch (error) {
+        if (error.response) {
+            console.error('❌ Instagram reply error detail:', JSON.stringify(error.response.data));
+        }
         console.error('❌ Error sending reply:', error.response?.data || error.message);
 
         // Handle Instagram API errors
