@@ -50,6 +50,12 @@ export default function DMReplyForm({ recipientId, commentId, onSuccess }) {
         }
     };
 
+    const quickReplies = [
+        { label: '👋 Saludo', text: '¡Hola! Qué gusto saludarte. ¿Cómo podemos ayudarte hoy?' },
+        { label: '💰 Precio/Info', text: '¡Hola! Claro que sí, con gusto te envío toda la información y precios por este medio. ¿Qué producto te interesó?' },
+        { label: '📍 Ubicación', text: '¡Hola! Estamos ubicados en [Tu Ciudad/Dirección]. ¿Te gustaría visitarnos?' },
+    ];
+
     return (
         <form className="dm-form" onSubmit={handleSubmit}>
             {error && (
@@ -57,6 +63,20 @@ export default function DMReplyForm({ recipientId, commentId, onSuccess }) {
                     <span>⚠️</span> {error}
                 </div>
             )}
+
+            <div className="quick-replies">
+                {quickReplies.map((qr, idx) => (
+                    <button
+                        key={idx}
+                        type="button"
+                        className="qr-pill"
+                        onClick={() => setMessage(qr.text)}
+                        disabled={loading}
+                    >
+                        {qr.label}
+                    </button>
+                ))}
+            </div>
 
             <div className="dm-input-row">
                 <input
