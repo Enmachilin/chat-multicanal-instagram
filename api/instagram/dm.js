@@ -2,8 +2,8 @@ import axios from 'axios';
 import { db } from '../../lib/firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
-const GRAPH_API_VERSION = 'v24.0';
-const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
+const GRAPH_API_VERSION = 'v21.0';
+const GRAPH_API_BASE = `https://graph.instagram.com/${GRAPH_API_VERSION}`;
 
 /**
  * Send a Direct Message to an Instagram user
@@ -32,20 +32,17 @@ export default async function handler(req, res) {
             });
         }
 
-        // Send DM via Instagram Graph API
+        // Send DM via Instagram API (matching the user's working curl)
         const response = await axios.post(
-            `${GRAPH_API_BASE}/${process.env.INSTAGRAM_ACCOUNT_ID}/messages`,
+            `${GRAPH_API_BASE}/me/messages`,
             {
-                recipient: {
-                    id: recipientId
-                },
-                message: {
-                    text: message
-                }
+                // Note: The user's curl uses stringified JSON for these fields
+                recipient: JSON.stringify({ id: recipientId }),
+                message: JSON.stringify({ text: message })
             },
             {
                 headers: {
-                    'Authorization': `Bearer ${process.env.META_ACCESS_TOKEN}`,
+                    'Authorization': `Bearer ${process.env.META_ACCESS_TOKEN?.trim()}`,
                     'Content-Type': 'application/json'
                 },
                 timeout: 15000,
