@@ -29,11 +29,14 @@ export default function MessagesList() {
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-                updatedAt: doc.data().updatedAt?.toDate?.() || new Date(),
-            }));
+            const data = snapshot.docs
+                .map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    updatedAt: doc.data().updatedAt?.toDate?.() || new Date(),
+                }))
+                .filter(conv => conv.lastMessage && conv.lastMessage.text); // Solo mostrar si tiene contenido
+
             setConversations(data);
             setLoading(false);
         });
