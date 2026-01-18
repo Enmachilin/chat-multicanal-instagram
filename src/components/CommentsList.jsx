@@ -4,7 +4,8 @@ import {
     query,
     orderBy,
     onSnapshot,
-    where
+    where,
+    limit
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import ReplyForm from './ReplyForm';
