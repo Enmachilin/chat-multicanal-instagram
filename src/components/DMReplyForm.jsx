@@ -35,7 +35,8 @@ export default function DMReplyForm({ recipientId, commentId, onSuccess }) {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.message || data.error || 'Error al enviar mensaje');
+                const errorDetail = data.details?.debug ? ` (${data.details.debug})` : '';
+                throw new Error(`${data.error || 'Error al enviar mensaje'}${errorDetail}`);
             }
 
             setMessage('');
