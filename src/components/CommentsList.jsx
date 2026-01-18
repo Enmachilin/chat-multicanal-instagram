@@ -180,7 +180,7 @@ export default function CommentsList() {
                                     <div className="reply-content dashboard-reply">
                                         <div className="comment-header">
                                             <span className="comment-username admin-name">
-                                                Tú (vía App)
+                                                Tú (vía Dashboard)
                                             </span>
                                             <span className="comment-time">
                                                 {formatDate(reply.sentAt)}
